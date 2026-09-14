@@ -135,24 +135,23 @@ async function appendToLog(cfg, basePath, device, lines) {
 }
 
 function parsePropfind(xml, requestPath) {
-  const hrefRegex = /<[Dd]:href>([^<]+)<\/[Dd]:href>/g
-  const collectionRegex = /<[Dd]:collection\s*\/?>/
-  const sizeRegex = /<[Dd]:getcontentlength>(\d+)<\/[Dd]:getcontentlength>/
-
   const results = []
-  const responseBlocks = xml.split(/<\/?[Dd]:response>/g).filter(b => b.includes('href'))
+  const trimSlash = s => s.replace(/\/+$/, '')
+  const normalised = decodeURIComponent(trimSlash(requestPath))
 
-  const normalised = decodeURIComponent(requestPath.trimEnd('/'))
-
-  for (const block of responseBlocks) {
-    const hrefMatch = block.match(/<[Dd]:href>([^<]+)<\/[Dd]:href>/)
+  // Match any response block regardless of namespace prefix (D:, d:, etc.)
+  const responseRegex = /<(?:[A-Za-z]+:)?response[^>]*>([\s\S]*?)<\/(?:[A-Za-z]+:)?response>/gi
+  let m
+  while ((m = responseRegex.exec(xml)) !== null) {
+    const block = m[1]
+    const hrefMatch = block.match(/<(?:[A-Za-z]+:)?href[^>]*>([^<]+)<\/(?:[A-Za-z]+:)?href>/i)
     if (!hrefMatch) continue
     const href = decodeURIComponent(hrefMatch[1].trim())
-    if (href.trimEnd('/') === normalised) continue
-    const isDir = collectionRegex.test(block)
-    const sizeMatch = block.match(/<[Dd]:getcontentlength>(\d+)<\/[Dd]:getcontentlength>/)
+    if (trimSlash(href) === normalised) continue
+    const isDir = /<(?:[A-Za-z]+:)?collection[\s/>]/i.test(block)
+    const sizeMatch = block.match(/<(?:[A-Za-z]+:)?getcontentlength[^>]*>(\d+)<\/(?:[A-Za-z]+:)?getcontentlength>/i)
     const size = sizeMatch ? parseInt(sizeMatch[1]) : 0
-    const name = href.trimEnd('/').split('/').pop()
+    const name = trimSlash(href).split('/').pop()
     if (name) results.push({ name, isDir, size, href })
   }
   return results

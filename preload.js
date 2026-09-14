@@ -6,7 +6,10 @@ contextBridge.exposeInMainWorld('api', {
     save: (cfg) => ipcRenderer.invoke('config:save', cfg)
   },
   sync: {
-    run: (cfg) => ipcRenderer.invoke('sync:run', cfg)
+    run:    (cfg) => ipcRenderer.invoke('sync:run', cfg),
+    reset:  ()    => ipcRenderer.invoke('sync:reset'),
+    getLog: ()    => ipcRenderer.invoke('sync:get-log'),
+    onAutoDone: (cb) => ipcRenderer.on('auto-sync-done', (_, r) => cb(r))
   },
   files: {
     list:        (cfg, remotePath) => ipcRenderer.invoke('files:list', cfg, remotePath),

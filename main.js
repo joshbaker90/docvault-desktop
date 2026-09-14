@@ -23,8 +23,27 @@ function createWindow() {
   win.loadFile('renderer/index.html')
 }
 
+let autoSyncInterval = null
+
+function startAutoSync(cfg) {
+  clearInterval(autoSyncInterval)
+  if (!cfg.syncEnabled || !cfg.hetznerPassword) return
+  const ms = (cfg.syncIntervalMinutes || 60) * 60 * 1000
+  autoSyncInterval = setInterval(async () => {
+    const current = config.load()
+    if (!current.hetznerPassword || !current.syncEnabled) return
+    try {
+      const result = await sync.run(current)
+      appendSyncLog(result.log)
+      const wins = BrowserWindow.getAllWindows()
+      if (wins.length) wins[0].webContents.send('auto-sync-done', result)
+    } catch (_) {}
+  }, ms)
+}
+
 app.whenReady().then(() => {
   createWindow()
+  startAutoSync(config.load())
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
@@ -34,14 +53,54 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
+// ── Sync log ─────────────────────────────────────────────────────────────
+const { app: electronApp } = require('electron')
+
+function syncLogPath() {
+  return path.join(app.getPath('userData'), 'sync.log')
+}
+
+function appendSyncLog(lines) {
+  try {
+    const ts = new Date().toISOString()
+    const entry = `[${ts}]\n${lines.join('\n')}\n\n`
+    const existing = fs.existsSync(syncLogPath()) ? fs.readFileSync(syncLogPath(), 'utf8') : ''
+    const trimmed = (entry + existing).slice(0, 50000)
+    fs.writeFileSync(syncLogPath(), trimmed)
+  } catch (_) {}
+}
+
 // ── Config ───────────────────────────────────────────────────────────────
 ipcMain.handle('config:get',  ()    => config.load())
-ipcMain.handle('config:save', (_, cfg) => { config.save(cfg); return true })
+ipcMain.handle('config:save', (_, cfg) => {
+  config.save(cfg)
+  startAutoSync(cfg)
+  return true
+})
 
 // ── Sync ─────────────────────────────────────────────────────────────────
 ipcMain.handle('sync:run', async (_, cfg) => {
-  try { return await sync.run(cfg) }
+  try {
+    const result = await sync.run(cfg)
+    appendSyncLog(result.log)
+    return result
+  }
   catch (e) { return { uploaded: 0, downloaded: 0, failed: [], log: [e.message], summary: `Error: ${e.message}` } }
+})
+
+ipcMain.handle('sync:reset', () => {
+  config.setCursors({})
+  const docDir = path.join(app.getPath('documents'), 'DocVault')
+  if (fs.existsSync(docDir)) {
+    fs.rmSync(docDir, { recursive: true, force: true })
+  }
+  return true
+})
+
+ipcMain.handle('sync:get-log', () => {
+  try {
+    return fs.existsSync(syncLogPath()) ? fs.readFileSync(syncLogPath(), 'utf8') : 'No sync log yet. Run a sync first.'
+  } catch (_) { return 'Could not read sync log.' }
 })
 
 // ── Files ─────────────────────────────────────────────────────────────────

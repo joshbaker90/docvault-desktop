@@ -59,6 +59,19 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Settings
   document.getElementById('save-settings-btn').addEventListener('click', saveSettings)
   document.getElementById('test-connection-btn').addEventListener('click', testConnection)
+  document.getElementById('reset-resync-btn').addEventListener('click', resetResync)
+  document.getElementById('view-log-btn').addEventListener('click', viewSyncLog)
+  document.getElementById('s-sync-enabled').addEventListener('change', e => {
+    document.getElementById('s-interval-group').style.display = e.target.checked ? '' : 'none'
+  })
+
+  // Auto-sync background notification
+  window.api.sync.onAutoDone(result => {
+    document.getElementById('sync-status').textContent = result.summary || 'Auto-synced'
+    loadFileList(currentPath)
+    loadBookmarks()
+    loadClips()
+  })
 
   // Confirm
   document.getElementById('confirm-cancel').addEventListener('click', closeConfirm)
@@ -80,6 +93,7 @@ function switchTab(name) {
   document.getElementById('panel-' + name).classList.add('active')
   document.querySelector(`.nav-btn[data-tab="${name}"]`).classList.add('active')
   document.getElementById('topbar-title').textContent = TAB_TITLES[name] || name
+  if (name === 'docs' && cfg.hetznerPassword) loadFileList(currentPath)
 }
 
 // ── Sync ─────────────────────────────────────────────────────────────────
@@ -338,27 +352,58 @@ async function deleteClip(id) {
 
 // ── Settings ─────────────────────────────────────────────────────────────
 function loadSettingsForm() {
-  document.getElementById('s-host').value   = cfg.hetznerHost     || ''
-  document.getElementById('s-user').value   = cfg.hetznerUser     || ''
-  document.getElementById('s-pass').value   = cfg.hetznerPassword || ''
-  document.getElementById('s-base').value   = cfg.hetznerBasePath || '/docvault'
-  document.getElementById('s-device').value = cfg.deviceName      || ''
-  document.getElementById('s-dir').value    = cfg.syncDirection   || 'both'
+  document.getElementById('s-host').value        = cfg.hetznerHost          || ''
+  document.getElementById('s-user').value        = cfg.hetznerUser          || ''
+  document.getElementById('s-pass').value        = cfg.hetznerPassword      || ''
+  document.getElementById('s-base').value        = cfg.hetznerBasePath      || '/docvault'
+  document.getElementById('s-device').value      = cfg.deviceName           || ''
+  document.getElementById('s-dir').value         = cfg.syncDirection        || 'both'
+  document.getElementById('s-sync-enabled').checked = !!cfg.syncEnabled
+  document.getElementById('s-interval').value   = String(cfg.syncIntervalMinutes || 60)
+  document.getElementById('s-interval-group').style.display = cfg.syncEnabled ? '' : 'none'
 }
 async function saveSettings() {
   cfg = {
     ...cfg,
-    hetznerHost:     document.getElementById('s-host').value.trim(),
-    hetznerUser:     document.getElementById('s-user').value.trim(),
-    hetznerPassword: document.getElementById('s-pass').value,
-    hetznerBasePath: document.getElementById('s-base').value.trim() || '/docvault',
-    deviceName:      document.getElementById('s-device').value.trim(),
-    syncDirection:   document.getElementById('s-dir').value
+    hetznerHost:          document.getElementById('s-host').value.trim(),
+    hetznerUser:          document.getElementById('s-user').value.trim(),
+    hetznerPassword:      document.getElementById('s-pass').value,
+    hetznerBasePath:      document.getElementById('s-base').value.trim() || '/docvault',
+    deviceName:           document.getElementById('s-device').value.trim(),
+    syncDirection:        document.getElementById('s-dir').value,
+    syncEnabled:          document.getElementById('s-sync-enabled').checked,
+    syncIntervalMinutes:  parseInt(document.getElementById('s-interval').value) || 60
   }
   await window.api.config.save(cfg)
   const msg = document.getElementById('save-msg')
   msg.classList.add('show')
   setTimeout(() => msg.classList.remove('show'), 2500)
+}
+async function resetResync() {
+  showConfirm('Delete all locally-synced documents and re-download them?', async () => {
+    await window.api.sync.reset()
+    toast('Reset complete — syncing now…')
+    await runSync()
+  })
+}
+async function viewSyncLog() {
+  const text = await window.api.sync.getLog()
+  const modal = document.createElement('div')
+  modal.className = 'overlay show'
+  modal.innerHTML = `
+    <div class="modal modal-lg">
+      <div class="modal-header"><h3>Sync Log</h3></div>
+      <pre class="log-pre">${esc(text)}</pre>
+      <div class="modal-actions">
+        <button class="mbtn" id="log-copy-btn">Copy</button>
+        <button class="mbtn cancel" id="log-close-btn">Close</button>
+      </div>
+    </div>`
+  document.body.appendChild(modal)
+  modal.querySelector('#log-close-btn').addEventListener('click', () => modal.remove())
+  modal.querySelector('#log-copy-btn').addEventListener('click', () => {
+    navigator.clipboard.writeText(text).then(() => toast('Copied'))
+  })
 }
 async function testConnection() {
   await saveSettings()

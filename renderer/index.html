@@ -132,10 +132,39 @@
           </select>
         </div>
       </div>
+      <div class="settings-card">
+        <div class="settings-label">Background Sync</div>
+        <div class="form-row">
+          <div class="form-row-text">
+            <span class="form-row-title">Auto-sync</span>
+            <span class="form-row-sub">Automatically sync in the background</span>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="s-sync-enabled">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <div class="form-group" id="s-interval-group">
+          <label>Sync interval</label>
+          <select id="s-interval">
+            <option value="15">Every 15 minutes</option>
+            <option value="30">Every 30 minutes</option>
+            <option value="60" selected>Every hour</option>
+            <option value="120">Every 2 hours</option>
+            <option value="360">Every 6 hours</option>
+          </select>
+        </div>
+      </div>
       <div class="settings-actions">
         <button id="save-settings-btn" class="tbtn primary">Save</button>
         <button id="test-connection-btn" class="tbtn">Test connection</button>
         <span id="save-msg" class="save-ok">✓ Saved</span>
+      </div>
+      <div class="settings-card">
+        <div class="settings-label">Advanced</div>
+        <p class="settings-hint">Reset &amp; Resync removes all locally-synced documents and re-downloads them fresh. Use this to fix duplicate or missing files.</p>
+        <button id="reset-resync-btn" class="tbtn danger-outline">Reset &amp; Resync</button>
+        <button id="view-log-btn" class="tbtn" style="margin-top:8px">View Sync Log</button>
       </div>
     </div>
   </div>
