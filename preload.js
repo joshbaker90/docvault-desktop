@@ -1,0 +1,25 @@
+const { contextBridge, ipcRenderer } = require('electron')
+
+contextBridge.exposeInMainWorld('api', {
+  config: {
+    get:  ()    => ipcRenderer.invoke('config:get'),
+    save: (cfg) => ipcRenderer.invoke('config:save', cfg)
+  },
+  sync: {
+    run: (cfg) => ipcRenderer.invoke('sync:run', cfg)
+  },
+  files: {
+    list:        (cfg, remotePath) => ipcRenderer.invoke('files:list', cfg, remotePath),
+    open:        (cfg, remotePath, name) => ipcRenderer.invoke('files:open', cfg, remotePath, name),
+    upload:      (cfg, currentPath) => ipcRenderer.invoke('files:upload', cfg, currentPath),
+    delete:      (cfg, remotePath, localRel) => ipcRenderer.invoke('files:delete', cfg, remotePath, localRel),
+    openLocal:   (localPath) => ipcRenderer.invoke('files:open-local', localPath)
+  },
+  bookmarks: {
+    get:    ()         => ipcRenderer.invoke('bookmarks:get'),
+    add:    (b)        => ipcRenderer.invoke('bookmarks:add', b),
+    update: (b)        => ipcRenderer.invoke('bookmarks:update', b),
+    delete: (id)       => ipcRenderer.invoke('bookmarks:delete', id),
+    openUrl:(url)      => ipcRenderer.invoke('bookmarks:open-url', url)
+  }
+})

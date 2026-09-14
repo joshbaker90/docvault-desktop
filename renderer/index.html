@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+  <title>DocVault</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header>
+  <h1>📁 DocVault</h1>
+  <span id="sync-status"></span>
+  <button id="sync-btn" onclick="runSync()">⟳ Sync</button>
+</header>
+
+<nav>
+  <button class="active" onclick="showTab('docs')" id="tab-docs">📄 Documents</button>
+  <button onclick="showTab('bookmarks')" id="tab-bookmarks">🔖 Bookmarks</button>
+  <button onclick="showTab('settings')" id="tab-settings">⚙️ Settings</button>
+</nav>
+
+<main>
+  <!-- Documents Tab -->
+  <div class="tab-content active" id="tab-content-docs">
+    <div class="docs-toolbar">
+      <div class="breadcrumb" id="breadcrumb">
+        <span onclick="navigateTo('')">Home</span>
+      </div>
+      <button onclick="addFiles()">＋ Add files</button>
+    </div>
+    <div class="file-list" id="file-list">
+      <div class="empty-state">
+        <div class="icon">📂</div>
+        <div>Sync to load your documents</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bookmarks Tab -->
+  <div class="tab-content" id="tab-content-bookmarks">
+    <div class="bookmarks-list" id="bookmarks-list">
+      <div class="empty-state">
+        <div class="icon">🔖</div>
+        <div>No bookmarks yet — tap + to add one</div>
+      </div>
+    </div>
+    <button class="add-fab" onclick="showAddBookmark()" title="Add bookmark">＋</button>
+  </div>
+
+  <!-- Settings Tab -->
+  <div class="tab-content" id="tab-content-settings">
+    <div class="settings-form">
+      <h2>Hetzner Storage Box</h2>
+      <div class="form-group">
+        <label>Host</label>
+        <input type="text" id="s-host" placeholder="https://u663296.your-storagebox.de">
+      </div>
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" id="s-user" placeholder="u663296">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="s-pass" placeholder="••••••••">
+      </div>
+      <div class="form-group">
+        <label>Base Path</label>
+        <input type="text" id="s-base" placeholder="/docvault">
+      </div>
+
+      <h2 style="margin-top:24px">Device</h2>
+      <div class="form-group">
+        <label>Device Name</label>
+        <input type="text" id="s-device" placeholder="My-MacBook">
+      </div>
+      <div class="form-group">
+        <label>Sync Direction</label>
+        <select id="s-dir">
+          <option value="both">Both ways</option>
+          <option value="upload">Upload only</option>
+          <option value="download">Download only</option>
+        </select>
+      </div>
+
+      <div class="settings-actions">
+        <button class="btn-primary" onclick="saveSettings()">Save</button>
+        <button class="btn-secondary" onclick="testConnection()">Test connection</button>
+        <span class="save-msg" id="save-msg">✓ Saved</span>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- Bookmark modal -->
+<div class="modal-overlay" id="bookmark-modal">
+  <div class="modal">
+    <h3 id="bm-modal-title">Add bookmark</h3>
+    <div class="form-group">
+      <label>Title</label>
+      <input type="text" id="bm-title" placeholder="Google">
+    </div>
+    <div class="form-group">
+      <label>URL</label>
+      <input type="url" id="bm-url" placeholder="https://google.com">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeBookmarkModal()">Cancel</button>
+      <button class="btn-save" onclick="saveBookmark()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm modal -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal">
+    <h3 id="confirm-title">Confirm</h3>
+    <p id="confirm-msg" style="color:#555; margin-bottom:8px"></p>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeConfirm()">Cancel</button>
+      <button class="btn-save" id="confirm-ok" style="background:#c62828">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="renderer.js"></script>
+</body>
+</html>

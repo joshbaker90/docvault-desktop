@@ -1,0 +1,37 @@
+{
+  "name": "docvault-desktop",
+  "version": "1.0.0",
+  "description": "DocVault desktop client — sync documents and bookmarks via Hetzner",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:linux": "electron-builder --linux",
+    "build:win":   "electron-builder --win",
+    "build:mac":   "electron-builder --mac"
+  },
+  "devDependencies": {
+    "electron":         "^28.3.3",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId":       "uk.joshdev.docvault.desktop",
+    "productName": "DocVault",
+    "files": ["main.js", "preload.js", "hetzner.js", "sync.js", "config.js", "renderer/**/*"],
+    "linux": {
+      "target": [{"target": "AppImage", "arch": ["x64"]}],
+      "category": "Utility"
+    },
+    "win": {
+      "target": [{"target": "nsis", "arch": ["x64"]}]
+    },
+    "mac": {
+      "target": [{"target": "dmg", "arch": ["x64", "arm64"]}],
+      "category": "public.app-category.productivity",
+      "identity": null
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
