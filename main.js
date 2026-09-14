@@ -150,6 +150,9 @@ function appendSyncLog(lines) {
   } catch (_) {}
 }
 
+// ── App info ──────────────────────────────────────────────────────────────
+ipcMain.handle('app:version', () => app.getVersion())
+
 // ── Config ───────────────────────────────────────────────────────────────
 ipcMain.handle('config:get',  ()    => config.load())
 ipcMain.handle('config:save', (_, cfg) => {

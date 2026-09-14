@@ -35,6 +35,10 @@ window.addEventListener('DOMContentLoaded', async () => {
 
 async function initApp() {
   cfg = await window.api.config.get()
+  window.api.app.version().then(v => {
+    const el = document.getElementById('app-version-line')
+    if (el) el.textContent = `DocVault Desktop v${v}`
+  })
   loadSettingsForm()
   await loadBookmarks()
   await loadClips()
