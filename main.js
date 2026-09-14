@@ -25,6 +25,43 @@ function createWindow() {
 }
 
 let autoSyncInterval = null
+let isSyncing = false
+
+// ── File watcher — queues locally-modified files for upload ───────────────
+function startFileWatcher() {
+  const docDir = path.join(app.getPath('documents'), 'DocVault')
+  fs.mkdirSync(docDir, { recursive: true })
+
+  const timers = new Map()
+
+  try {
+    fs.watch(docDir, { recursive: true }, (_, filename) => {
+      if (!filename || isSyncing) return
+      const base = path.basename(filename)
+      // Skip temp/hidden files created by editors
+      if (base.startsWith('.') || base.startsWith('~$') || base.endsWith('.tmp') || base.endsWith('.swp')) return
+
+      const relPath = filename.replace(/\\/g, '/')
+      const fullPath = path.join(docDir, filename)
+
+      clearTimeout(timers.get(relPath))
+      timers.set(relPath, setTimeout(() => {
+        timers.delete(relPath)
+        try {
+          const stat = fs.statSync(fullPath)
+          if (!stat.isDirectory()) {
+            const events = config.getPendingEvents()
+            if (!events.some(e => e.action === 'create' && e.path === relPath)) {
+              config.addPendingEvent({ action: 'create', path: relPath })
+            }
+          }
+        } catch (_) {}
+      }, 1500))
+    })
+  } catch (e) {
+    console.error('File watcher error:', e.message)
+  }
+}
 
 function startAutoSync(cfg) {
   clearInterval(autoSyncInterval)
@@ -45,6 +82,7 @@ function startAutoSync(cfg) {
 app.whenReady().then(() => {
   createWindow()
   startAutoSync(config.load())
+  startFileWatcher()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
@@ -122,12 +160,17 @@ ipcMain.handle('config:save', (_, cfg) => {
 
 // ── Sync ─────────────────────────────────────────────────────────────────
 ipcMain.handle('sync:run', async (_, cfg) => {
+  isSyncing = true
   try {
     const result = await sync.run(cfg)
     appendSyncLog(result.log)
     return result
   }
   catch (e) { return { uploaded: 0, downloaded: 0, failed: [], log: [e.message], summary: `Error: ${e.message}` } }
+  finally {
+    // Delay re-enabling the watcher so downloaded files don't immediately queue for re-upload
+    setTimeout(() => { isSyncing = false }, 2000)
+  }
 })
 
 ipcMain.handle('sync:reset', () => {
