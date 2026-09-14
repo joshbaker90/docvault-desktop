@@ -29,5 +29,13 @@ contextBridge.exposeInMainWorld('api', {
     get:    ()         => ipcRenderer.invoke('clips:get'),
     add:    (c)        => ipcRenderer.invoke('clips:add', c),
     delete: (id)       => ipcRenderer.invoke('clips:delete', id)
+  },
+  lock: {
+    isEnabled:        ()    => ipcRenderer.invoke('lock:is-enabled'),
+    check:            (pin) => ipcRenderer.invoke('lock:check', pin),
+    set:              (pin) => ipcRenderer.invoke('lock:set', pin),
+    disable:          ()    => ipcRenderer.invoke('lock:disable'),
+    touchIdAvailable: ()    => ipcRenderer.invoke('lock:touch-id-available'),
+    touchId:          ()    => ipcRenderer.invoke('lock:touch-id')
   }
 })

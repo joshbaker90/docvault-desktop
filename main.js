@@ -1,6 +1,7 @@
-const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron')
+const { app, BrowserWindow, ipcMain, dialog, shell, Menu, systemPreferences } = require('electron')
 const path = require('path')
 const fs = require('fs')
+const crypto = require('crypto')
 const hetzner = require('./hetzner')
 const sync = require('./sync')
 const config = require('./config')
@@ -53,8 +54,49 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
+// ── Lock ─────────────────────────────────────────────────────────────────
+function hashPin(pin) {
+  return crypto.createHash('sha256').update('docvault:' + pin).digest('hex')
+}
+
+ipcMain.handle('lock:is-enabled', () => {
+  const cfg = config.load()
+  return !!(cfg.lockEnabled && cfg.lockPinHash)
+})
+
+ipcMain.handle('lock:check', (_, pin) => {
+  const cfg = config.load()
+  return cfg.lockPinHash === hashPin(pin)
+})
+
+ipcMain.handle('lock:set', (_, pin) => {
+  const cfg = config.load()
+  cfg.lockEnabled = true
+  cfg.lockPinHash = hashPin(pin)
+  config.save(cfg)
+  return true
+})
+
+ipcMain.handle('lock:disable', () => {
+  const cfg = config.load()
+  cfg.lockEnabled = false
+  cfg.lockPinHash = ''
+  config.save(cfg)
+  return true
+})
+
+ipcMain.handle('lock:touch-id-available', () => {
+  return process.platform === 'darwin' && systemPreferences.canPromptTouchID()
+})
+
+ipcMain.handle('lock:touch-id', async () => {
+  try {
+    await systemPreferences.promptTouchID('Unlock DocVault')
+    return true
+  } catch (_) { return false }
+})
+
 // ── Sync log ─────────────────────────────────────────────────────────────
-const { app: electronApp } = require('electron')
 
 function syncLogPath() {
   return path.join(app.getPath('userData'), 'sync.log')

@@ -161,12 +161,68 @@
         <span id="save-msg" class="save-ok">✓ Saved</span>
       </div>
       <div class="settings-card">
+        <div class="settings-label">Security</div>
+        <div class="form-row">
+          <div class="form-row-text">
+            <span class="form-row-title">App lock</span>
+            <span class="form-row-sub" id="lock-status-text">PIN required on launch</span>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="s-lock-enabled">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <button id="change-pin-btn" class="tbtn" style="display:none">Change PIN</button>
+      </div>
+      <div class="settings-card">
         <div class="settings-label">Advanced</div>
         <p class="settings-hint">Reset &amp; Resync removes all locally-synced documents and re-downloads them fresh. Use this to fix duplicate or missing files.</p>
         <button id="reset-resync-btn" class="tbtn danger-outline">Reset &amp; Resync</button>
         <button id="view-log-btn" class="tbtn" style="margin-top:8px">View Sync Log</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- PIN modal -->
+<div class="overlay" id="pin-modal">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h3 id="pin-modal-title">Set PIN</h3>
+    </div>
+    <div class="form-group">
+      <label>PIN (4–8 digits)</label>
+      <input type="password" id="pin-input" inputmode="numeric" maxlength="8" placeholder="••••">
+    </div>
+    <div class="form-group">
+      <label>Confirm PIN</label>
+      <input type="password" id="pin-confirm" inputmode="numeric" maxlength="8" placeholder="••••">
+    </div>
+    <p id="pin-error" class="lock-error" style="margin-bottom:8px"></p>
+    <div class="modal-actions">
+      <button class="mbtn cancel" id="pin-cancel">Cancel</button>
+      <button class="mbtn save" id="pin-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Lock screen -->
+<div id="lock-screen" class="lock-overlay">
+  <div class="lock-box">
+    <div class="lock-icon">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="#3B82F6"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+    </div>
+    <h2 class="lock-title">DocVault is locked</h2>
+    <p class="lock-sub">Enter your PIN to continue</p>
+    <div class="lock-dots" id="lock-dots">
+      <span></span><span></span><span></span><span></span>
+    </div>
+    <input type="password" id="lock-pin" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="PIN">
+    <p id="lock-error" class="lock-error"></p>
+    <button id="touch-id-btn" class="lock-touchid-btn" style="display:none">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.81 4.47c-.08 0-.16-.02-.23-.06C15.66 3.42 14 3 12.01 3c-1.98 0-3.86.47-5.57 1.41-.24.13-.54.04-.68-.2-.13-.24-.04-.55.2-.68C7.82 2.52 9.86 2 12.01 2c2.13 0 3.99.47 6.03 1.52.25.13.34.43.21.67-.09.18-.26.28-.44.28zM3.5 9.72c-.1 0-.2-.03-.29-.09-.23-.16-.28-.47-.12-.7.99-1.4 2.25-2.5 3.75-3.27C9.23 4.83 10.62 4.5 12 4.5c1.38 0 2.77.33 4.14 1.05 1.5.77 2.76 1.86 3.75 3.25.16.22.11.54-.12.7-.23.16-.54.11-.7-.12-.9-1.29-2.07-2.31-3.46-3.01C14.55 5.68 13.28 5.5 12 5.5c-1.28 0-2.55.18-3.65.76-1.39.7-2.57 1.71-3.46 2.99-.1.15-.26.47-.39.47zm6.25 12.07c-.13 0-.26-.05-.35-.15-.87-.87-1.34-1.43-2.01-2.64-.69-1.23-1.05-2.73-1.05-4.34 0-2.97 2.54-5.39 5.66-5.39s5.66 2.42 5.66 5.39c0 .28-.22.5-.5.5s-.5-.22-.5-.5c0-2.42-2.09-4.39-4.66-4.39-2.57 0-4.66 1.97-4.66 4.39 0 1.44.32 2.77.93 3.85.64 1.15 1.08 1.64 1.85 2.42.19.2.19.51 0 .71-.11.1-.24.15-.37.15zm7.17-1.85c-1.19 0-2.24-.3-3.1-.89-1.49-1.01-2.38-2.65-2.38-4.39 0-.28.22-.5.5-.5s.5.22.5.5c0 1.41.72 2.74 1.94 3.56.71.48 1.54.72 2.54.72.24 0 .64-.03 1.04-.1.27-.05.53.13.58.41.05.27-.13.53-.41.58-.57.11-1.07.11-1.21.11zm-1.67-6.04c-.28 0-.5-.22-.5-.5 0-.28.22-.5.5-.5 1.77 0 2.82 1.1 2.82 2.94 0 .28-.22.5-.5.5s-.5-.22-.5-.5c0-1.39-.54-1.94-1.82-1.94z"/></svg>
+      Use Touch ID
+    </button>
   </div>
 </div>
 

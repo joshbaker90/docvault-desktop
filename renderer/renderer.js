@@ -25,6 +25,15 @@ function mkIaBtn(cls, title, path) {
 
 // ── Init ─────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
+  const locked = await window.api.lock.isEnabled()
+  if (locked) {
+    await showLockScreen()
+  } else {
+    await initApp()
+  }
+})
+
+async function initApp() {
   cfg = await window.api.config.get()
   loadSettingsForm()
   await loadBookmarks()
@@ -64,6 +73,13 @@ window.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('s-sync-enabled').addEventListener('change', e => {
     document.getElementById('s-interval-group').style.display = e.target.checked ? '' : 'none'
   })
+  document.getElementById('s-lock-enabled').addEventListener('change', e => {
+    if (e.target.checked) showPinModal('set')
+    else disableLock()
+  })
+  document.getElementById('change-pin-btn').addEventListener('click', () => showPinModal('change'))
+  document.getElementById('pin-cancel').addEventListener('click', closePinModal)
+  document.getElementById('pin-save').addEventListener('click', savePinModal)
 
   // Auto-sync background notification
   window.api.sync.onAutoDone(result => {
@@ -78,13 +94,14 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // Keyboard
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { closeBookmarkModal(); closeClipModal(); closeConfirm() }
+    if (e.key === 'Escape') { closeBookmarkModal(); closeClipModal(); closeConfirm(); closePinModal() }
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       if (document.getElementById('bookmark-modal').classList.contains('show')) saveBookmark()
       if (document.getElementById('clip-modal').classList.contains('show')) saveClip()
+      if (document.getElementById('pin-modal').classList.contains('show')) savePinModal()
     }
   })
-})
+}
 
 // ── Tabs ─────────────────────────────────────────────────────────────────
 function switchTab(name) {
@@ -361,6 +378,12 @@ function loadSettingsForm() {
   document.getElementById('s-sync-enabled').checked = !!cfg.syncEnabled
   document.getElementById('s-interval').value   = String(cfg.syncIntervalMinutes || 60)
   document.getElementById('s-interval-group').style.display = cfg.syncEnabled ? '' : 'none'
+  const locked = !!(cfg.lockEnabled && cfg.lockPinHash)
+  document.getElementById('s-lock-enabled').checked  = locked
+  document.getElementById('change-pin-btn').style.display = locked ? '' : 'none'
+  document.getElementById('lock-status-text').textContent = locked
+    ? 'PIN required on launch'
+    : 'No lock — anyone can open the app'
 }
 async function saveSettings() {
   cfg = {
@@ -414,6 +437,98 @@ async function testConnection() {
   } catch (e) {
     toast(`Connection failed: ${e.message}`)
   }
+}
+
+// ── Lock screen ──────────────────────────────────────────────────────────
+async function showLockScreen() {
+  const screen = document.getElementById('lock-screen')
+  screen.classList.add('show')
+  const pinInput = document.getElementById('lock-pin')
+  const dotsEl   = document.getElementById('lock-dots')
+  const errorEl  = document.getElementById('lock-error')
+
+  function updateDots(val) {
+    const dots = dotsEl.querySelectorAll('span')
+    dots.forEach((d, i) => d.classList.toggle('filled', i < val.length))
+  }
+
+  pinInput.addEventListener('input', () => { updateDots(pinInput.value); errorEl.textContent = '' })
+  pinInput.addEventListener('keydown', async e => {
+    if (e.key === 'Enter') await attemptPin()
+  })
+  pinInput.focus()
+
+  async function attemptPin() {
+    const ok = await window.api.lock.check(pinInput.value)
+    if (ok) {
+      screen.classList.remove('show')
+      await initApp()
+    } else {
+      errorEl.textContent = 'Incorrect PIN'
+      pinInput.value = ''
+      updateDots('')
+      pinInput.focus()
+    }
+  }
+
+  const touchAvail = await window.api.lock.touchIdAvailable()
+  if (touchAvail) {
+    const tidBtn = document.getElementById('touch-id-btn')
+    tidBtn.style.display = 'flex'
+    tidBtn.addEventListener('click', async () => {
+      const ok = await window.api.lock.touchId()
+      if (ok) { screen.classList.remove('show'); await initApp() }
+      else errorEl.textContent = 'Touch ID failed'
+    })
+    // Auto-prompt
+    const autoOk = await window.api.lock.touchId()
+    if (autoOk) { screen.classList.remove('show'); await initApp() }
+  }
+}
+
+// ── Lock settings ─────────────────────────────────────────────────────────
+let pinModalMode = 'set'
+
+function showPinModal(mode) {
+  pinModalMode = mode
+  document.getElementById('pin-modal-title').textContent = mode === 'set' ? 'Set PIN' : 'Change PIN'
+  document.getElementById('pin-input').value   = ''
+  document.getElementById('pin-confirm').value = ''
+  document.getElementById('pin-error').textContent = ''
+  document.getElementById('pin-modal').classList.add('show')
+  setTimeout(() => document.getElementById('pin-input').focus(), 40)
+}
+
+function closePinModal() {
+  document.getElementById('pin-modal').classList.remove('show')
+  // If user cancels 'set', revert the toggle
+  if (pinModalMode === 'set') {
+    document.getElementById('s-lock-enabled').checked = false
+    document.getElementById('change-pin-btn').style.display = 'none'
+  }
+}
+
+async function savePinModal() {
+  const pin     = document.getElementById('pin-input').value
+  const confirm = document.getElementById('pin-confirm').value
+  const errEl   = document.getElementById('pin-error')
+  if (pin.length < 4)    { errEl.textContent = 'PIN must be at least 4 digits'; return }
+  if (!/^\d+$/.test(pin)) { errEl.textContent = 'PIN must be digits only'; return }
+  if (pin !== confirm)   { errEl.textContent = 'PINs do not match'; return }
+  await window.api.lock.set(pin)
+  document.getElementById('pin-modal').classList.remove('show')
+  document.getElementById('s-lock-enabled').checked = true
+  document.getElementById('change-pin-btn').style.display = ''
+  document.getElementById('lock-status-text').textContent = 'PIN required on launch'
+  toast('App lock enabled')
+}
+
+async function disableLock() {
+  await window.api.lock.disable()
+  document.getElementById('s-lock-enabled').checked = false
+  document.getElementById('change-pin-btn').style.display = 'none'
+  document.getElementById('lock-status-text').textContent = 'No lock — anyone can open the app'
+  toast('App lock disabled')
 }
 
 // ── Confirm ─────────────────────────────────────────────────────────────
