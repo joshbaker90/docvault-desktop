@@ -9,6 +9,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   cfg = await window.api.config.get()
   loadSettingsForm()
   await loadBookmarks()
+  await loadClips()
   if (cfg.hetznerPassword) {
     await loadFileList(currentPath)
   }
@@ -37,6 +38,7 @@ async function runSync() {
     toast(result.summary || 'Sync complete')
     await loadFileList(currentPath)
     await loadBookmarks()
+    await loadClips()
   } catch (e) {
     status.textContent = `Error: ${e.message}`
     toast(`Sync failed: ${e.message}`)
@@ -243,6 +245,92 @@ async function deleteBookmark(id, title) {
   })
 }
 
+// ── Clips ─────────────────────────────────────────────────────────────────
+async function loadClips() {
+  const clips = await window.api.clips.get()
+  renderClips(clips)
+}
+
+function renderClips(clips) {
+  const list = document.getElementById('clips-list')
+  if (clips.length === 0) {
+    list.innerHTML = '<div class="empty-state"><div class="icon">📋</div><div>No clips yet — tap + to save a copy-paste</div></div>'
+    return
+  }
+  list.innerHTML = ''
+  for (const clip of clips) {
+    const el = document.createElement('div')
+    el.className = 'clip-item'
+    el.innerHTML = `
+      <div class="clip-content">${esc(clip.content)}</div>
+      <div class="clip-meta">
+        <span>${esc(clip.deviceName)} · ${formatDate(clip.addedAt)}</span>
+        <div class="clip-actions">
+          <button title="Copy" onclick="event.stopPropagation(); copyClip('${esc(clip.id)}', this)">📋</button>
+          <button class="del" title="Delete" onclick="event.stopPropagation(); deleteClip('${esc(clip.id)}')">🗑</button>
+        </div>
+      </div>
+    `
+    el.setAttribute('data-content', clip.content)
+    el.onclick = () => copyClipContent(clip.content)
+    list.appendChild(el)
+  }
+}
+
+function copyClipContent(content) {
+  navigator.clipboard.writeText(content).then(() => toast('Copied to clipboard'))
+}
+
+function copyClip(id, btn) {
+  const item = btn.closest('.clip-item')
+  const content = item.getAttribute('data-content')
+  copyClipContent(content)
+}
+
+function showAddClip() {
+  navigator.clipboard.readText().then(text => {
+    document.getElementById('clip-text').value = text || ''
+  }).catch(() => {
+    document.getElementById('clip-text').value = ''
+  })
+  document.getElementById('clip-modal').classList.add('show')
+  document.getElementById('clip-text').focus()
+}
+
+function closeClipModal() {
+  document.getElementById('clip-modal').classList.remove('show')
+}
+
+async function saveClip() {
+  const text = document.getElementById('clip-text').value.trim()
+  if (!text) { toast('Text is required'); return }
+  const clip = {
+    id: crypto.randomUUID(),
+    content: text,
+    deviceName: cfg.deviceName || 'desktop',
+    addedAt: Date.now(),
+    deletedAt: 0
+  }
+  await window.api.clips.add(clip)
+  closeClipModal()
+  await loadClips()
+  if (cfg.hetznerPassword) window.api.sync.run(cfg).then(() => loadClips()).catch(() => {})
+}
+
+async function deleteClip(id) {
+  confirm('Delete this clip?', async () => {
+    await window.api.clips.delete(id)
+    await loadClips()
+    if (cfg.hetznerPassword) window.api.sync.run(cfg).then(() => loadClips()).catch(() => {})
+  })
+}
+
+function formatDate(ms) {
+  const d = new Date(ms)
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) + ', ' +
+    d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+}
+
 // ── Settings ─────────────────────────────────────────────────────────────
 function loadSettingsForm() {
   document.getElementById('s-host').value   = cfg.hetznerHost || ''
@@ -326,6 +414,7 @@ function fileIcon(name) {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     closeBookmarkModal()
+    closeClipModal()
     closeConfirm()
   }
 })

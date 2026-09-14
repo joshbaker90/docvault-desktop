@@ -19,6 +19,10 @@ function bookmarksPath() {
   return path.join(app.getPath('userData'), 'bookmarks.json')
 }
 
+function clipsPath() {
+  return path.join(app.getPath('userData'), 'clips.json')
+}
+
 function load() {
   try {
     if (fs.existsSync(configPath())) {
@@ -84,4 +88,15 @@ function saveLocalBookmarks(bookmarks) {
   fs.writeFileSync(bookmarksPath(), JSON.stringify(bookmarks))
 }
 
-module.exports = { load, save, getPendingEvents, setPendingEvents, addPendingEvent, clearPendingEvents, getCursors, setCursors, getLocalBookmarks, saveLocalBookmarks, bookmarksPath }
+function getLocalClips() {
+  try {
+    if (fs.existsSync(clipsPath())) return JSON.parse(fs.readFileSync(clipsPath(), 'utf8'))
+  } catch (_) {}
+  return []
+}
+
+function saveLocalClips(clips) {
+  fs.writeFileSync(clipsPath(), JSON.stringify(clips))
+}
+
+module.exports = { load, save, getPendingEvents, setPendingEvents, addPendingEvent, clearPendingEvents, getCursors, setCursors, getLocalBookmarks, saveLocalBookmarks, bookmarksPath, getLocalClips, saveLocalClips }

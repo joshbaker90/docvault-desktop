@@ -10,16 +10,17 @@ function docDir() {
   return dir
 }
 
-function mergeBookmarks(local, remote) {
+function mergeByUUID(local, remote, timestamp) {
   const map = new Map()
-  for (const b of [...local, ...remote]) {
-    const existing = map.get(b.id)
-    if (!existing) { map.set(b.id, b); continue }
-    const existingTime = existing.deletedAt > 0 ? existing.deletedAt : existing.addedAt
-    const bTime = b.deletedAt > 0 ? b.deletedAt : b.addedAt
-    if (bTime > existingTime) map.set(b.id, b)
+  for (const item of [...local, ...remote]) {
+    const existing = map.get(item.id)
+    if (!existing || timestamp(item) > timestamp(existing)) map.set(item.id, item)
   }
   return Array.from(map.values())
+}
+
+function mergeBookmarks(local, remote) {
+  return mergeByUUID(local, remote, b => b.deletedAt > 0 ? b.deletedAt : b.addedAt)
 }
 
 async function run(cfg) {
@@ -29,6 +30,18 @@ async function run(cfg) {
   const log = []
   let uploaded = 0, downloaded = 0
   const failed = []
+
+  // ── Clips sync ──────────────────────────────────────────────────────────
+  try {
+    const clipsPath = `${basePath}/.clips.json`
+    const localClips = config.getLocalClips()
+    const remoteJson = await hetzner.downloadText(cfg, clipsPath)
+    const remoteClips = remoteJson ? JSON.parse(remoteJson) : []
+    const mergedClips = mergeByUUID(localClips, remoteClips, c => c.deletedAt > 0 ? c.deletedAt : c.addedAt)
+    config.saveLocalClips(mergedClips)
+    await hetzner.uploadText(cfg, clipsPath, JSON.stringify(mergedClips))
+    log.push(`Clips: merged ${mergedClips.length}`)
+  } catch (e) { log.push(`Clips error: ${e.message}`) }
 
   // ── Bookmarks sync ──────────────────────────────────────────────────────
   try {

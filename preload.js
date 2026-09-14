@@ -21,5 +21,10 @@ contextBridge.exposeInMainWorld('api', {
     update: (b)        => ipcRenderer.invoke('bookmarks:update', b),
     delete: (id)       => ipcRenderer.invoke('bookmarks:delete', id),
     openUrl:(url)      => ipcRenderer.invoke('bookmarks:open-url', url)
+  },
+  clips: {
+    get:    ()         => ipcRenderer.invoke('clips:get'),
+    add:    (c)        => ipcRenderer.invoke('clips:add', c),
+    delete: (id)       => ipcRenderer.invoke('clips:delete', id)
   }
 })

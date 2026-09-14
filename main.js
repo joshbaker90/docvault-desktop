@@ -126,3 +126,20 @@ ipcMain.handle('bookmarks:delete', (_, id) => {
 ipcMain.handle('bookmarks:open-url', (_, url) => {
   shell.openExternal(url)
 })
+
+// ── Clips ─────────────────────────────────────────────────────────────────
+ipcMain.handle('clips:get', () => config.getLocalClips().filter(c => !c.deletedAt || c.deletedAt === 0))
+
+ipcMain.handle('clips:add', (_, clip) => {
+  const clips = config.getLocalClips()
+  clips.push(clip)
+  config.saveLocalClips(clips)
+  return true
+})
+
+ipcMain.handle('clips:delete', (_, id) => {
+  const now = Date.now()
+  const clips = config.getLocalClips().map(c => c.id === id ? { ...c, deletedAt: now } : c)
+  config.saveLocalClips(clips)
+  return true
+})

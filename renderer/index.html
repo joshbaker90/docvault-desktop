@@ -18,6 +18,7 @@
 <nav>
   <button class="active" onclick="showTab('docs')" id="tab-docs">📄 Documents</button>
   <button onclick="showTab('bookmarks')" id="tab-bookmarks">🔖 Bookmarks</button>
+  <button onclick="showTab('clips')" id="tab-clips">📋 Clips</button>
   <button onclick="showTab('settings')" id="tab-settings">⚙️ Settings</button>
 </nav>
 
@@ -47,6 +48,17 @@
       </div>
     </div>
     <button class="add-fab" onclick="showAddBookmark()" title="Add bookmark">＋</button>
+  </div>
+
+  <!-- Clips Tab -->
+  <div class="tab-content" id="tab-content-clips">
+    <div class="clips-list" id="clips-list">
+      <div class="empty-state">
+        <div class="icon">📋</div>
+        <div>No clips yet — tap + to save a copy-paste</div>
+      </div>
+    </div>
+    <button class="add-fab" onclick="showAddClip()" title="Add clip">＋</button>
   </div>
 
   <!-- Settings Tab -->
@@ -108,6 +120,21 @@
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeBookmarkModal()">Cancel</button>
       <button class="btn-save" onclick="saveBookmark()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Clip modal -->
+<div class="modal-overlay" id="clip-modal">
+  <div class="modal">
+    <h3>Save clip</h3>
+    <div class="form-group">
+      <label>Text</label>
+      <textarea id="clip-text" rows="6" placeholder="Paste your text here…" style="width:100%;resize:vertical;font-family:monospace;font-size:13px;padding:8px;border:1px solid #ddd;border-radius:6px;box-sizing:border-box"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeClipModal()">Cancel</button>
+      <button class="btn-save" onclick="saveClip()">Save</button>
     </div>
   </div>
 </div>
