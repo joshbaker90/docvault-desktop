@@ -121,10 +121,11 @@ async function run(cfg) {
 
         if (event.action === 'create') {
           const f = path.join(dir, event.path)
-          if (!fs.existsSync(f)) {
+          const isPeer = peer !== device
+          if (isPeer || !fs.existsSync(f)) {
             const ok = await hetzner.downloadFile(cfg, `${basePath}/${event.path}`, f)
             if (ok) { downloaded++; succeededNames.add(path.basename(f)); log.push(`↓ ${event.path}`) }
-            else { fs.existsSync(f) && fs.unlinkSync(f); pendingFailed.push(path.basename(f)) }
+            else { try { if (fs.statSync(f).size === 0) fs.unlinkSync(f) } catch (_) {}; pendingFailed.push(path.basename(f)) }
           }
         } else if (event.action === 'delete') {
           const f = path.join(dir, event.path)
