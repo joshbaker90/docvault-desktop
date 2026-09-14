@@ -1,8 +1,27 @@
-// State
 let cfg = {}
 let currentPath = ''
 let editingBookmarkId = null
 let confirmCallback = null
+
+const TAB_TITLES = { docs: 'Documents', bookmarks: 'Bookmarks', clips: 'Clips', settings: 'Settings' }
+
+const P = {
+  FOLDER:   'M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z',
+  DOC:      'M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z',
+  OPEN:     'M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z',
+  TRASH:    'M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z',
+  EDIT:     'M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z',
+  COPY:     'M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z',
+  BOOKMARK: 'M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z'
+}
+
+function mkSvg(path, size = 15) {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="currentColor"><path d="${path}"/></svg>`
+}
+
+function mkIaBtn(cls, title, path) {
+  return `<button class="ia-btn ${cls}" title="${title}">${mkSvg(path)}</button>`
+}
 
 // ── Init ─────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
@@ -10,155 +29,178 @@ window.addEventListener('DOMContentLoaded', async () => {
   loadSettingsForm()
   await loadBookmarks()
   await loadClips()
-  if (cfg.hetznerPassword) {
-    await loadFileList(currentPath)
-  }
+  if (cfg.hetznerPassword) loadFileList(currentPath)
+
+  // Sidebar nav
+  document.querySelectorAll('.nav-btn[data-tab]').forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab))
+  })
+
+  // Topbar
+  document.getElementById('sync-btn').addEventListener('click', runSync)
+
+  // Docs
+  document.getElementById('add-files-btn').addEventListener('click', addFiles)
+  document.getElementById('breadcrumb').addEventListener('click', e => {
+    const item = e.target.closest('.bc-item:not(.current)')
+    if (item) navigateTo(item.dataset.path)
+  })
+
+  // Bookmarks
+  document.getElementById('add-bookmark-btn').addEventListener('click', showAddBookmark)
+  document.getElementById('bm-cancel').addEventListener('click', closeBookmarkModal)
+  document.getElementById('bm-save').addEventListener('click', saveBookmark)
+
+  // Clips
+  document.getElementById('add-clip-btn').addEventListener('click', showAddClip)
+  document.getElementById('clip-cancel').addEventListener('click', closeClipModal)
+  document.getElementById('clip-save').addEventListener('click', saveClip)
+
+  // Settings
+  document.getElementById('save-settings-btn').addEventListener('click', saveSettings)
+  document.getElementById('test-connection-btn').addEventListener('click', testConnection)
+
+  // Confirm
+  document.getElementById('confirm-cancel').addEventListener('click', closeConfirm)
+
+  // Keyboard
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { closeBookmarkModal(); closeClipModal(); closeConfirm() }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      if (document.getElementById('bookmark-modal').classList.contains('show')) saveBookmark()
+      if (document.getElementById('clip-modal').classList.contains('show')) saveClip()
+    }
+  })
 })
 
 // ── Tabs ─────────────────────────────────────────────────────────────────
-function showTab(name) {
-  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'))
-  document.querySelectorAll('nav button').forEach(el => el.classList.remove('active'))
-  document.getElementById(`tab-content-${name}`).classList.add('active')
-  document.getElementById(`tab-${name}`).classList.add('active')
+function switchTab(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'))
+  document.querySelectorAll('.nav-btn[data-tab]').forEach(b => b.classList.remove('active'))
+  document.getElementById('panel-' + name).classList.add('active')
+  document.querySelector(`.nav-btn[data-tab="${name}"]`).classList.add('active')
+  document.getElementById('topbar-title').textContent = TAB_TITLES[name] || name
 }
 
 // ── Sync ─────────────────────────────────────────────────────────────────
 async function runSync() {
-  if (!cfg.hetznerPassword) { showTab('settings'); toast('Enter your Hetzner credentials first'); return }
+  if (!cfg.hetznerPassword) { switchTab('settings'); toast('Enter your Hetzner credentials first'); return }
   const btn = document.getElementById('sync-btn')
   const status = document.getElementById('sync-status')
   btn.disabled = true
   btn.classList.add('syncing')
-  btn.textContent = '⟳ Syncing…'
-  status.textContent = ''
+  status.textContent = 'Syncing…'
   try {
     const result = await window.api.sync.run(cfg)
-    status.textContent = result.summary || 'Done'
+    status.textContent = result.summary || 'Up to date'
     toast(result.summary || 'Sync complete')
     await loadFileList(currentPath)
     await loadBookmarks()
     await loadClips()
   } catch (e) {
-    status.textContent = `Error: ${e.message}`
+    status.textContent = 'Sync failed'
     toast(`Sync failed: ${e.message}`)
   } finally {
     btn.disabled = false
     btn.classList.remove('syncing')
-    btn.textContent = '⟳ Sync'
   }
 }
 
 // ── Documents ─────────────────────────────────────────────────────────────
 async function loadFileList(remotePath) {
-  const basePath = (cfg.hetznerBasePath || '/docvault').replace(/\/$/, '')
-  const fullRemotePath = remotePath ? `${basePath}/${remotePath}/` : `${basePath}/`
+  const base = basePath()
+  const fullPath = remotePath ? `${base}/${remotePath}/` : `${base}/`
   const list = document.getElementById('file-list')
-  list.innerHTML = '<div class="empty-state"><div class="icon">⏳</div><div>Loading…</div></div>'
-
+  list.innerHTML = '<div class="empty-state"><p>Loading…</p></div>'
   try {
-    const entries = await window.api.files.list(cfg, fullRemotePath)
-    renderFileList(entries, remotePath, basePath)
+    const entries = await window.api.files.list(cfg, fullPath)
+    renderFileList(entries, remotePath, base)
   } catch (e) {
-    list.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><div>Failed to load: ${e.message}</div></div>`
+    list.innerHTML = `<div class="empty-state"><p style="color:#DC2626">Failed: ${esc(e.message)}</p></div>`
   }
 }
 
-function renderFileList(entries, remotePath, basePath) {
-  const list = document.getElementById('file-list')
-
-  // Update breadcrumb
+function renderFileList(entries, remotePath, base) {
+  // Breadcrumb
   const bc = document.getElementById('breadcrumb')
-  if (!remotePath) {
-    bc.innerHTML = '<span class="current">Home</span>'
-  } else {
-    const parts = remotePath.split('/')
-    let html = '<span onclick="navigateTo(\'\')">Home</span>'
-    parts.forEach((part, i) => {
-      const pathSoFar = parts.slice(0, i + 1).join('/')
-      html += `<span class="sep">/</span>`
-      if (i === parts.length - 1) {
-        html += `<span class="current">${esc(part)}</span>`
-      } else {
-        html += `<span onclick="navigateTo('${esc(pathSoFar)}')">${esc(part)}</span>`
-      }
+  bc.innerHTML = ''
+  const home = el('span', { className: 'bc-item' + (!remotePath ? ' current' : ''), 'data-path': '' }, 'Home')
+  bc.appendChild(home)
+  if (remotePath) {
+    remotePath.split('/').forEach((part, i, arr) => {
+      const sep = el('span', { className: 'bc-sep' }, '/')
+      bc.appendChild(sep)
+      const isCurrent = i === arr.length - 1
+      const span = el('span', {
+        className: 'bc-item' + (isCurrent ? ' current' : ''),
+        'data-path': arr.slice(0, i + 1).join('/')
+      }, part)
+      bc.appendChild(span)
     })
-    bc.innerHTML = html
   }
 
-  if (entries.length === 0) {
-    list.innerHTML = '<div class="empty-state"><div class="icon">📂</div><div>Folder is empty</div></div>'
+  const list = document.getElementById('file-list')
+  if (!entries || entries.length === 0) {
+    list.innerHTML = `<div class="empty-state">${mkSvg(P.FOLDER, 40)}<p>This folder is empty</p></div>`
     return
   }
-
-  const dirs = entries.filter(e => e.isDir).sort((a, b) => a.name.localeCompare(b.name))
-  const files = entries.filter(e => !e.isDir && !e.name.startsWith('.')).sort((a, b) => a.name.localeCompare(b.name))
-
   list.innerHTML = ''
+
+  const dirs  = entries.filter(e => e.isDir).sort(byName)
+  const files = entries.filter(e => !e.isDir && !e.name.startsWith('.')).sort(byName)
 
   for (const dir of dirs) {
     const childPath = remotePath ? `${remotePath}/${dir.name}` : dir.name
-    const el = document.createElement('div')
-    el.className = 'file-item'
-    el.innerHTML = `
-      <div class="icon">📁</div>
-      <div class="info">
-        <div class="name">${esc(dir.name)}</div>
-        <div class="meta">Folder</div>
-      </div>
-      <div class="actions">
-        <button title="Delete folder" onclick="event.stopPropagation(); deleteEntry('${esc(basePath)}/${esc(childPath)}', '${esc(childPath)}')">🗑</button>
-      </div>
-    `
-    el.onclick = () => navigateTo(childPath)
-    list.appendChild(el)
+    const row = el('div', { className: 'file-item' })
+    row.innerHTML = `
+      <span class="fi-icon">📁</span>
+      <span class="fi-name">${esc(dir.name)}</span>
+      <div class="fi-actions">${mkIaBtn('danger', 'Delete', P.TRASH)}</div>`
+    row.addEventListener('click', () => navigateTo(childPath))
+    row.querySelector('.ia-btn').addEventListener('click', e => { e.stopPropagation(); deleteEntry(`${base}/${childPath}`, childPath) })
+    list.appendChild(row)
   }
 
   for (const file of files) {
-    const relPath = remotePath ? `${remotePath}/${file.name}` : file.name
-    const remoteFull = `${basePath}/${relPath}`
-    const el = document.createElement('div')
-    el.className = 'file-item'
-    el.innerHTML = `
-      <div class="icon">${fileIcon(file.name)}</div>
-      <div class="info">
-        <div class="name">${esc(file.name)}</div>
-        <div class="meta">${formatSize(file.size)}</div>
-      </div>
-      <div class="actions">
-        <button title="Open" onclick="event.stopPropagation(); openFile('${esc(remoteFull)}', '${esc(file.name)}')">↗</button>
-        <button title="Delete" onclick="event.stopPropagation(); deleteEntry('${esc(remoteFull)}', '${esc(relPath)}')">🗑</button>
-      </div>
-    `
-    el.onclick = () => openFile(remoteFull, file.name)
-    list.appendChild(el)
+    const relPath   = remotePath ? `${remotePath}/${file.name}` : file.name
+    const remoteFull = `${base}/${relPath}`
+    const row = el('div', { className: 'file-item' })
+    row.innerHTML = `
+      <span class="fi-icon">${fileIcon(file.name)}</span>
+      <span class="fi-name">${esc(file.name)}</span>
+      <span class="fi-meta">${formatSize(file.size)}</span>
+      <div class="fi-actions">
+        ${mkIaBtn('', 'Open', P.OPEN)}
+        ${mkIaBtn('danger', 'Delete', P.TRASH)}
+      </div>`
+    const [openBtn, delBtn] = row.querySelectorAll('.ia-btn')
+    row.addEventListener('click', () => openFile(remoteFull, file.name))
+    openBtn.addEventListener('click', e => { e.stopPropagation(); openFile(remoteFull, file.name) })
+    delBtn.addEventListener('click',  e => { e.stopPropagation(); deleteEntry(remoteFull, relPath) })
+    list.appendChild(row)
   }
 }
 
-function navigateTo(path) {
-  currentPath = path
-  loadFileList(path)
-}
+function navigateTo(path) { currentPath = path; loadFileList(path) }
 
 async function openFile(remotePath, name) {
   toast(`Opening ${name}…`)
-  const ok = await window.api.files.open(cfg, remotePath, name)
-  if (!ok) toast(`Failed to open ${name}`)
+  if (!await window.api.files.open(cfg, remotePath, name)) toast(`Failed to open ${name}`)
 }
 
 async function addFiles() {
-  if (!cfg.hetznerPassword) { showTab('settings'); toast('Enter your Hetzner credentials first'); return }
-  const basePath = (cfg.hetznerBasePath || '/docvault').replace(/\/$/, '')
-  const remotePath = currentPath ? `${basePath}/${currentPath}/` : `${basePath}/`
-  const result = await window.api.files.upload(cfg, remotePath)
+  if (!cfg.hetznerPassword) { switchTab('settings'); toast('Enter credentials first'); return }
+  const base = basePath()
+  const remote = currentPath ? `${base}/${currentPath}/` : `${base}/`
+  const result = await window.api.files.upload(cfg, remote)
   if (result.uploaded > 0) {
-    toast(`${result.uploaded} file${result.uploaded > 1 ? 's' : ''} uploaded`)
+    toast(`${result.uploaded} file${result.uploaded !== 1 ? 's' : ''} uploaded`)
     await loadFileList(currentPath)
   }
 }
 
 async function deleteEntry(remotePath, relPath) {
-  confirm(`Delete "${relPath.split('/').pop()}"?`, async () => {
+  showConfirm(`Delete "${relPath.split('/').pop()}"?`, async () => {
     await window.api.files.delete(cfg, remotePath, relPath)
     toast('Deleted')
     await loadFileList(currentPath)
@@ -167,33 +209,33 @@ async function deleteEntry(remotePath, relPath) {
 
 // ── Bookmarks ─────────────────────────────────────────────────────────────
 async function loadBookmarks() {
-  const bookmarks = await window.api.bookmarks.get()
-  renderBookmarks(bookmarks)
+  renderBookmarks(await window.api.bookmarks.get())
 }
 
 function renderBookmarks(bookmarks) {
   const list = document.getElementById('bookmarks-list')
-  if (bookmarks.length === 0) {
-    list.innerHTML = '<div class="empty-state"><div class="icon">🔖</div><div>No bookmarks yet — tap + to add one</div></div>'
+  if (!bookmarks.length) {
+    list.innerHTML = `<div class="empty-state">${mkSvg(P.BOOKMARK, 40)}<p>No bookmarks yet</p><p class="sub">Tap "Add bookmark" to save a link</p></div>`
     return
   }
   list.innerHTML = ''
   for (const bm of bookmarks) {
-    const el = document.createElement('div')
-    el.className = 'bookmark-item'
-    el.innerHTML = `
-      <div class="bm-icon">🔖</div>
+    const row = el('div', { className: 'bm-item' })
+    row.innerHTML = `
+      <div class="bm-favicon">${mkSvg(P.BOOKMARK, 14)}</div>
       <div class="bm-info">
         <div class="bm-title">${esc(bm.title)}</div>
         <div class="bm-url">${esc(bm.url)}</div>
       </div>
       <div class="bm-actions">
-        <button title="Edit" onclick="event.stopPropagation(); editBookmark('${esc(bm.id)}', '${esc(bm.title)}', '${esc(bm.url)}')">✏️</button>
-        <button class="del" title="Delete" onclick="event.stopPropagation(); deleteBookmark('${esc(bm.id)}', '${esc(bm.title)}')">🗑</button>
-      </div>
-    `
-    el.onclick = () => window.api.bookmarks.openUrl(bm.url)
-    list.appendChild(el)
+        ${mkIaBtn('', 'Edit', P.EDIT)}
+        ${mkIaBtn('danger', 'Delete', P.TRASH)}
+      </div>`
+    row.addEventListener('click', () => window.api.bookmarks.openUrl(bm.url))
+    const [editBtn, delBtn] = row.querySelectorAll('.ia-btn')
+    editBtn.addEventListener('click', e => { e.stopPropagation(); showEditBookmark(bm) })
+    delBtn.addEventListener('click',  e => { e.stopPropagation(); deleteBookmark(bm.id, bm.title) })
+    list.appendChild(row)
   }
 }
 
@@ -203,29 +245,25 @@ function showAddBookmark() {
   document.getElementById('bm-title').value = ''
   document.getElementById('bm-url').value = ''
   document.getElementById('bookmark-modal').classList.add('show')
-  document.getElementById('bm-title').focus()
+  setTimeout(() => document.getElementById('bm-title').focus(), 40)
 }
-
-function editBookmark(id, title, url) {
-  editingBookmarkId = id
+function showEditBookmark(bm) {
+  editingBookmarkId = bm.id
   document.getElementById('bm-modal-title').textContent = 'Edit bookmark'
-  document.getElementById('bm-title').value = title
-  document.getElementById('bm-url').value = url
+  document.getElementById('bm-title').value = bm.title
+  document.getElementById('bm-url').value   = bm.url
   document.getElementById('bookmark-modal').classList.add('show')
-  document.getElementById('bm-title').focus()
+  setTimeout(() => document.getElementById('bm-title').focus(), 40)
 }
-
 function closeBookmarkModal() {
   document.getElementById('bookmark-modal').classList.remove('show')
   editingBookmarkId = null
 }
-
 async function saveBookmark() {
   const title = document.getElementById('bm-title').value.trim()
-  let url = document.getElementById('bm-url').value.trim()
+  let url     = document.getElementById('bm-url').value.trim()
   if (!title || !url) { toast('Title and URL are required'); return }
-  if (!url.startsWith('http://') && !url.startsWith('https://')) url = 'https://' + url
-
+  if (!url.match(/^https?:\/\//)) url = 'https://' + url
   if (editingBookmarkId) {
     await window.api.bookmarks.update({ id: editingBookmarkId, title, url })
   } else {
@@ -233,12 +271,10 @@ async function saveBookmark() {
   }
   closeBookmarkModal()
   await loadBookmarks()
-  // Auto-sync bookmarks
   if (cfg.hetznerPassword) window.api.sync.run(cfg).then(() => loadBookmarks()).catch(() => {})
 }
-
 async function deleteBookmark(id, title) {
-  confirm(`Delete bookmark "${title}"?`, async () => {
+  showConfirm(`Delete "${title}"?`, async () => {
     await window.api.bookmarks.delete(id)
     await loadBookmarks()
     if (cfg.hetznerPassword) window.api.sync.run(cfg).then(() => loadBookmarks()).catch(() => {})
@@ -247,100 +283,68 @@ async function deleteBookmark(id, title) {
 
 // ── Clips ─────────────────────────────────────────────────────────────────
 async function loadClips() {
-  const clips = await window.api.clips.get()
-  renderClips(clips)
+  renderClips(await window.api.clips.get())
 }
 
 function renderClips(clips) {
   const list = document.getElementById('clips-list')
-  if (clips.length === 0) {
-    list.innerHTML = '<div class="empty-state"><div class="icon">📋</div><div>No clips yet — tap + to save a copy-paste</div></div>'
+  if (!clips.length) {
+    list.innerHTML = `<div class="empty-state">${mkSvg(P.COPY, 40)}<p>No clips yet</p><p class="sub">Add a clip to sync text between devices</p></div>`
     return
   }
   list.innerHTML = ''
   for (const clip of clips) {
-    const el = document.createElement('div')
-    el.className = 'clip-item'
-    el.innerHTML = `
+    const row = el('div', { className: 'clip-item' })
+    row.innerHTML = `
       <div class="clip-content">${esc(clip.content)}</div>
-      <div class="clip-meta">
-        <span>${esc(clip.deviceName)} · ${formatDate(clip.addedAt)}</span>
+      <div class="clip-footer">
+        <span class="clip-meta">${esc(clip.deviceName)} · ${fmtDate(clip.addedAt)}</span>
         <div class="clip-actions">
-          <button title="Copy" onclick="event.stopPropagation(); copyClip('${esc(clip.id)}', this)">📋</button>
-          <button class="del" title="Delete" onclick="event.stopPropagation(); deleteClip('${esc(clip.id)}')">🗑</button>
+          ${mkIaBtn('', 'Copy', P.COPY)}
+          ${mkIaBtn('danger', 'Delete', P.TRASH)}
         </div>
-      </div>
-    `
-    el.setAttribute('data-content', clip.content)
-    el.onclick = () => copyClipContent(clip.content)
-    list.appendChild(el)
+      </div>`
+    const [copyBtn, delBtn] = row.querySelectorAll('.ia-btn')
+    row.addEventListener('click', () => copyText(clip.content))
+    copyBtn.addEventListener('click', e => { e.stopPropagation(); copyText(clip.content) })
+    delBtn.addEventListener('click',  e => { e.stopPropagation(); deleteClip(clip.id) })
+    list.appendChild(row)
   }
 }
 
-function copyClipContent(content) {
-  navigator.clipboard.writeText(content).then(() => toast('Copied to clipboard'))
-}
-
-function copyClip(id, btn) {
-  const item = btn.closest('.clip-item')
-  const content = item.getAttribute('data-content')
-  copyClipContent(content)
-}
+function copyText(text) { navigator.clipboard.writeText(text).then(() => toast('Copied to clipboard')) }
 
 function showAddClip() {
-  navigator.clipboard.readText().then(text => {
-    document.getElementById('clip-text').value = text || ''
-  }).catch(() => {
-    document.getElementById('clip-text').value = ''
-  })
+  navigator.clipboard.readText().then(t => document.getElementById('clip-text').value = t || '').catch(() => {})
   document.getElementById('clip-modal').classList.add('show')
-  document.getElementById('clip-text').focus()
+  setTimeout(() => document.getElementById('clip-text').focus(), 40)
 }
-
-function closeClipModal() {
-  document.getElementById('clip-modal').classList.remove('show')
-}
-
+function closeClipModal() { document.getElementById('clip-modal').classList.remove('show') }
 async function saveClip() {
   const text = document.getElementById('clip-text').value.trim()
   if (!text) { toast('Text is required'); return }
-  const clip = {
-    id: crypto.randomUUID(),
-    content: text,
-    deviceName: cfg.deviceName || 'desktop',
-    addedAt: Date.now(),
-    deletedAt: 0
-  }
-  await window.api.clips.add(clip)
+  await window.api.clips.add({ id: crypto.randomUUID(), content: text, deviceName: cfg.deviceName || 'desktop', addedAt: Date.now(), deletedAt: 0 })
   closeClipModal()
   await loadClips()
   if (cfg.hetznerPassword) window.api.sync.run(cfg).then(() => loadClips()).catch(() => {})
 }
-
 async function deleteClip(id) {
-  confirm('Delete this clip?', async () => {
+  showConfirm('Delete this clip?', async () => {
     await window.api.clips.delete(id)
     await loadClips()
     if (cfg.hetznerPassword) window.api.sync.run(cfg).then(() => loadClips()).catch(() => {})
   })
 }
 
-function formatDate(ms) {
-  const d = new Date(ms)
-  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) + ', ' +
-    d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
-}
-
 // ── Settings ─────────────────────────────────────────────────────────────
 function loadSettingsForm() {
-  document.getElementById('s-host').value   = cfg.hetznerHost || ''
-  document.getElementById('s-user').value   = cfg.hetznerUser || ''
+  document.getElementById('s-host').value   = cfg.hetznerHost     || ''
+  document.getElementById('s-user').value   = cfg.hetznerUser     || ''
   document.getElementById('s-pass').value   = cfg.hetznerPassword || ''
   document.getElementById('s-base').value   = cfg.hetznerBasePath || '/docvault'
-  document.getElementById('s-device').value = cfg.deviceName || ''
-  document.getElementById('s-dir').value    = cfg.syncDirection || 'both'
+  document.getElementById('s-device').value = cfg.deviceName      || ''
+  document.getElementById('s-dir').value    = cfg.syncDirection   || 'both'
 }
-
 async function saveSettings() {
   cfg = {
     ...cfg,
@@ -354,67 +358,76 @@ async function saveSettings() {
   await window.api.config.save(cfg)
   const msg = document.getElementById('save-msg')
   msg.classList.add('show')
-  setTimeout(() => msg.classList.remove('show'), 2000)
+  setTimeout(() => msg.classList.remove('show'), 2500)
 }
-
 async function testConnection() {
   await saveSettings()
   toast('Testing connection…')
   try {
-    const basePath = (cfg.hetznerBasePath || '/docvault').replace(/\/$/, '')
-    const entries = await window.api.files.list(cfg, `${basePath}/`)
-    toast(`Connected ✓ (${entries.length} items found)`)
+    const entries = await window.api.files.list(cfg, `${basePath()}/`)
+    toast(`Connected ✓  (${entries.length} items)`)
   } catch (e) {
     toast(`Connection failed: ${e.message}`)
   }
 }
 
-// ── Confirm modal ─────────────────────────────────────────────────────────
-function confirm(msg, cb) {
-  confirmCallback = cb
+// ── Confirm ─────────────────────────────────────────────────────────────
+function showConfirm(msg, cb) {
   document.getElementById('confirm-msg').textContent = msg
-  document.getElementById('confirm-modal').classList.add('show')
   document.getElementById('confirm-ok').onclick = () => { closeConfirm(); cb() }
+  document.getElementById('confirm-modal').classList.add('show')
 }
-function closeConfirm() {
-  document.getElementById('confirm-modal').classList.remove('show')
-  confirmCallback = null
-}
+function closeConfirm() { document.getElementById('confirm-modal').classList.remove('show') }
 
-// ── Toast ─────────────────────────────────────────────────────────────────
+// ── Toast ────────────────────────────────────────────────────────────────
 let toastTimer
 function toast(msg) {
-  const el = document.getElementById('toast')
-  el.textContent = msg
-  el.classList.add('show')
+  const t = document.getElementById('toast')
+  t.textContent = msg
+  t.classList.add('show')
   clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => el.classList.remove('show'), 3000)
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3000)
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────
-function esc(str) {
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')
+// ── Helpers ──────────────────────────────────────────────────────────────
+function basePath() { return (cfg.hetznerBasePath || '/docvault').replace(/\/$/, '') }
+function byName(a, b) { return a.name.localeCompare(b.name) }
+
+function el(tag, attrs, text) {
+  const node = document.createElement(tag)
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (k.startsWith('data-')) node.dataset[k.slice(5)] = v
+    else node[k] = v
+  }
+  if (text !== undefined) node.textContent = text
+  return node
 }
 
-function formatSize(bytes) {
-  if (!bytes) return ''
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')
+}
+
+function formatSize(b) {
+  if (!b) return ''
+  if (b < 1024) return `${b} B`
+  if (b < 1048576) return `${(b/1024).toFixed(1)} KB`
+  return `${(b/1048576).toFixed(1)} MB`
 }
 
 function fileIcon(name) {
-  const ext = name.split('.').pop().toLowerCase()
-  const map = { pdf: '📕', doc: '📝', docx: '📝', xls: '📊', xlsx: '📊', ppt: '📑', pptx: '📑',
-    jpg: '🖼', jpeg: '🖼', png: '🖼', gif: '🖼', mp4: '🎬', mp3: '🎵', zip: '📦', txt: '📄' }
-  return map[ext] || '📄'
+  const ext = (name.split('.').pop() || '').toLowerCase()
+  const m = {pdf:'📕',doc:'📝',docx:'📝',xls:'📊',xlsx:'📊',ppt:'📑',pptx:'📑',
+    jpg:'🖼',jpeg:'🖼',png:'🖼',gif:'🖼',webp:'🖼',svg:'🖼',
+    mp4:'🎬',mov:'🎬',mp3:'🎵',m4a:'🎵',wav:'🎵',zip:'📦',rar:'📦',
+    txt:'📄',md:'📄',json:'📋',js:'📋',ts:'📋',py:'📋',html:'📋',css:'📋'}
+  return m[ext] || '📄'
 }
 
-// Keyboard shortcuts
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') {
-    closeBookmarkModal()
-    closeClipModal()
-    closeConfirm()
-  }
-})
+function fmtDate(ms) {
+  const d = new Date(ms)
+  const diff = Math.floor((Date.now() - ms) / 86400000)
+  if (diff === 0) return 'Today ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})
+  if (diff === 1) return 'Yesterday'
+  if (diff < 7)  return d.toLocaleDateString([], {weekday:'short'})
+  return d.toLocaleDateString([], {day:'numeric', month:'short'})
+}

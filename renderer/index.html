@@ -3,112 +3,150 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
   <title>DocVault</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-<header>
-  <h1>📁 DocVault</h1>
-  <span id="sync-status"></span>
-  <button id="sync-btn" onclick="runSync()">⟳ Sync</button>
-</header>
+<!-- Sidebar -->
+<aside id="sidebar">
+  <div class="sidebar-logo">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="#60A5FA">
+      <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
+    </svg>
+    <span>DocVault</span>
+  </div>
 
-<nav>
-  <button class="active" onclick="showTab('docs')" id="tab-docs">📄 Documents</button>
-  <button onclick="showTab('bookmarks')" id="tab-bookmarks">🔖 Bookmarks</button>
-  <button onclick="showTab('clips')" id="tab-clips">📋 Clips</button>
-  <button onclick="showTab('settings')" id="tab-settings">⚙️ Settings</button>
-</nav>
+  <nav class="sidebar-nav">
+    <button class="nav-btn active" data-tab="docs">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>
+      <span>Documents</span>
+    </button>
+    <button class="nav-btn" data-tab="bookmarks">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M17 3H7c-1.1 0-1.99.9-1.99 2L5 21l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg>
+      <span>Bookmarks</span>
+    </button>
+    <button class="nav-btn" data-tab="clips">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+      <span>Clips</span>
+    </button>
+  </nav>
 
-<main>
-  <!-- Documents Tab -->
-  <div class="tab-content active" id="tab-content-docs">
-    <div class="docs-toolbar">
-      <div class="breadcrumb" id="breadcrumb">
-        <span onclick="navigateTo('')">Home</span>
-      </div>
-      <button onclick="addFiles()">＋ Add files</button>
+  <div class="sidebar-footer">
+    <button class="nav-btn" data-tab="settings">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.56-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.22-.07.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+      <span>Settings</span>
+    </button>
+  </div>
+</aside>
+
+<!-- Main -->
+<div id="main">
+  <!-- Topbar -->
+  <header id="topbar">
+    <span id="topbar-title">Documents</span>
+    <div id="topbar-right">
+      <span id="sync-status"></span>
+      <button id="sync-btn">
+        <svg id="sync-icon" width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
+        Sync
+      </button>
     </div>
-    <div class="file-list" id="file-list">
+  </header>
+
+  <!-- Documents -->
+  <div id="panel-docs" class="panel active">
+    <div class="toolbar">
+      <nav id="breadcrumb" class="breadcrumb"></nav>
+      <button id="add-files-btn" class="tbtn primary">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        Add files
+      </button>
+    </div>
+    <div id="file-list" class="list-area">
       <div class="empty-state">
-        <div class="icon">📂</div>
-        <div>Sync to load your documents</div>
+        <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" class="es-icon"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+        <p>Sync to load your documents</p>
       </div>
     </div>
   </div>
 
-  <!-- Bookmarks Tab -->
-  <div class="tab-content" id="tab-content-bookmarks">
-    <div class="bookmarks-list" id="bookmarks-list">
-      <div class="empty-state">
-        <div class="icon">🔖</div>
-        <div>No bookmarks yet — tap + to add one</div>
-      </div>
+  <!-- Bookmarks -->
+  <div id="panel-bookmarks" class="panel">
+    <div class="toolbar">
+      <span class="toolbar-hint">Click a bookmark to open it</span>
+      <button id="add-bookmark-btn" class="tbtn primary">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        Add bookmark
+      </button>
     </div>
-    <button class="add-fab" onclick="showAddBookmark()" title="Add bookmark">＋</button>
+    <div id="bookmarks-list" class="list-area"></div>
   </div>
 
-  <!-- Clips Tab -->
-  <div class="tab-content" id="tab-content-clips">
-    <div class="clips-list" id="clips-list">
-      <div class="empty-state">
-        <div class="icon">📋</div>
-        <div>No clips yet — tap + to save a copy-paste</div>
-      </div>
+  <!-- Clips -->
+  <div id="panel-clips" class="panel">
+    <div class="toolbar">
+      <span class="toolbar-hint">Click a clip to copy it to your clipboard</span>
+      <button id="add-clip-btn" class="tbtn primary">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        Add clip
+      </button>
     </div>
-    <button class="add-fab" onclick="showAddClip()" title="Add clip">＋</button>
+    <div id="clips-list" class="list-area"></div>
   </div>
 
-  <!-- Settings Tab -->
-  <div class="tab-content" id="tab-content-settings">
-    <div class="settings-form">
-      <h2>Hetzner Storage Box</h2>
-      <div class="form-group">
-        <label>Host</label>
-        <input type="text" id="s-host" placeholder="https://u663296.your-storagebox.de">
+  <!-- Settings -->
+  <div id="panel-settings" class="panel">
+    <div class="settings-scroll">
+      <div class="settings-card">
+        <div class="settings-label">Storage</div>
+        <div class="form-group">
+          <label>Host</label>
+          <input type="text" id="s-host" placeholder="https://u663296.your-storagebox.de">
+        </div>
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="s-user" placeholder="u663296">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="s-pass" placeholder="••••••••">
+        </div>
+        <div class="form-group">
+          <label>Base path</label>
+          <input type="text" id="s-base" placeholder="/docvault">
+        </div>
       </div>
-      <div class="form-group">
-        <label>Username</label>
-        <input type="text" id="s-user" placeholder="u663296">
+      <div class="settings-card">
+        <div class="settings-label">Device</div>
+        <div class="form-group">
+          <label>Device name</label>
+          <input type="text" id="s-device" placeholder="My-PC">
+        </div>
+        <div class="form-group">
+          <label>Sync direction</label>
+          <select id="s-dir">
+            <option value="both">Both ways</option>
+            <option value="upload">Upload only</option>
+            <option value="download">Download only</option>
+          </select>
+        </div>
       </div>
-      <div class="form-group">
-        <label>Password</label>
-        <input type="password" id="s-pass" placeholder="••••••••">
-      </div>
-      <div class="form-group">
-        <label>Base Path</label>
-        <input type="text" id="s-base" placeholder="/docvault">
-      </div>
-
-      <h2 style="margin-top:24px">Device</h2>
-      <div class="form-group">
-        <label>Device Name</label>
-        <input type="text" id="s-device" placeholder="My-MacBook">
-      </div>
-      <div class="form-group">
-        <label>Sync Direction</label>
-        <select id="s-dir">
-          <option value="both">Both ways</option>
-          <option value="upload">Upload only</option>
-          <option value="download">Download only</option>
-        </select>
-      </div>
-
       <div class="settings-actions">
-        <button class="btn-primary" onclick="saveSettings()">Save</button>
-        <button class="btn-secondary" onclick="testConnection()">Test connection</button>
-        <span class="save-msg" id="save-msg">✓ Saved</span>
+        <button id="save-settings-btn" class="tbtn primary">Save</button>
+        <button id="test-connection-btn" class="tbtn">Test connection</button>
+        <span id="save-msg" class="save-ok">✓ Saved</span>
       </div>
     </div>
   </div>
-</main>
+</div>
 
 <!-- Bookmark modal -->
-<div class="modal-overlay" id="bookmark-modal">
+<div class="overlay" id="bookmark-modal">
   <div class="modal">
-    <h3 id="bm-modal-title">Add bookmark</h3>
+    <div class="modal-header">
+      <h3 id="bm-modal-title">Add bookmark</h3>
+    </div>
     <div class="form-group">
       <label>Title</label>
       <input type="text" id="bm-title" placeholder="Google">
@@ -118,41 +156,44 @@
       <input type="url" id="bm-url" placeholder="https://google.com">
     </div>
     <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeBookmarkModal()">Cancel</button>
-      <button class="btn-save" onclick="saveBookmark()">Save</button>
+      <button class="mbtn cancel" id="bm-cancel">Cancel</button>
+      <button class="mbtn save" id="bm-save">Save</button>
     </div>
   </div>
 </div>
 
 <!-- Clip modal -->
-<div class="modal-overlay" id="clip-modal">
+<div class="overlay" id="clip-modal">
   <div class="modal">
-    <h3>Save clip</h3>
+    <div class="modal-header">
+      <h3>Save clip</h3>
+    </div>
     <div class="form-group">
       <label>Text</label>
-      <textarea id="clip-text" rows="6" placeholder="Paste your text here…" style="width:100%;resize:vertical;font-family:monospace;font-size:13px;padding:8px;border:1px solid #ddd;border-radius:6px;box-sizing:border-box"></textarea>
+      <textarea id="clip-text" rows="7" placeholder="Paste your text here…"></textarea>
     </div>
     <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeClipModal()">Cancel</button>
-      <button class="btn-save" onclick="saveClip()">Save</button>
+      <button class="mbtn cancel" id="clip-cancel">Cancel</button>
+      <button class="mbtn save" id="clip-save">Save</button>
     </div>
   </div>
 </div>
 
 <!-- Confirm modal -->
-<div class="modal-overlay" id="confirm-modal">
-  <div class="modal">
-    <h3 id="confirm-title">Confirm</h3>
-    <p id="confirm-msg" style="color:#555; margin-bottom:8px"></p>
+<div class="overlay" id="confirm-modal">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h3>Are you sure?</h3>
+    </div>
+    <p id="confirm-msg" class="confirm-text"></p>
     <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeConfirm()">Cancel</button>
-      <button class="btn-save" id="confirm-ok" style="background:#c62828">Delete</button>
+      <button class="mbtn cancel" id="confirm-cancel">Cancel</button>
+      <button class="mbtn danger" id="confirm-ok">Delete</button>
     </div>
   </div>
 </div>
 
 <div id="toast"></div>
-
 <script src="renderer.js"></script>
 </body>
 </html>

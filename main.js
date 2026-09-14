@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron')
+const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const hetzner = require('./hetzner')
@@ -6,11 +6,13 @@ const sync = require('./sync')
 const config = require('./config')
 
 function createWindow() {
+  Menu.setApplicationMenu(null)
   const win = new BrowserWindow({
     width:  1100,
     height: 750,
-    minWidth:  800,
-    minHeight: 600,
+    minWidth:  820,
+    minHeight: 560,
+    autoHideMenuBar: true,
     webPreferences: {
       preload:          path.join(__dirname, 'preload.js'),
       contextIsolation: true,
