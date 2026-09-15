@@ -1,6 +1,6 @@
 {
   "name": "docvault-desktop",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "description": "DocVault desktop client — sync documents, bookmarks and clips via Hetzner",
   "main": "main.js",
   "scripts": {
