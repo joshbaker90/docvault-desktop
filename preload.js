@@ -40,5 +40,11 @@ contextBridge.exposeInMainWorld('api', {
     disable:          ()    => ipcRenderer.invoke('lock:disable'),
     touchIdAvailable: ()    => ipcRenderer.invoke('lock:touch-id-available'),
     touchId:          ()    => ipcRenderer.invoke('lock:touch-id')
+  },
+  update: {
+    check:      ()           => ipcRenderer.invoke('update:check'),
+    download:   (url, name)  => ipcRenderer.invoke('update:download', url, name),
+    install:    (path)       => ipcRenderer.invoke('update:install', path),
+    onProgress: (cb)         => ipcRenderer.on('update:progress', (_, p) => cb(p))
   }
 })

@@ -1,6 +1,8 @@
 const { app, BrowserWindow, ipcMain, dialog, shell, Menu, systemPreferences } = require('electron')
 const path = require('path')
 const fs = require('fs')
+const https = require('https')
+const os = require('os')
 const crypto = require('crypto')
 const hetzner = require('./hetzner')
 const sync = require('./sync')
@@ -291,4 +293,91 @@ ipcMain.handle('clips:delete', (_, id) => {
   const clips = config.getLocalClips().map(c => c.id === id ? { ...c, deletedAt: now } : c)
   config.saveLocalClips(clips)
   return true
+})
+
+// ── Auto-updater ──────────────────────────────────────────────────────────
+function isNewerVersion(remote, local) {
+  const r = remote.replace(/^v/, '').split('.').map(Number)
+  const l = local.replace(/^v/, '').split('.').map(Number)
+  for (let i = 0; i < Math.max(r.length, l.length); i++) {
+    const rv = r[i] || 0, lv = l[i] || 0
+    if (rv !== lv) return rv > lv
+  }
+  return false
+}
+
+function httpsGet(url, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const follow = (u, depth) => {
+      if (depth > 5) return reject(new Error('Too many redirects'))
+      const opts = new URL(u)
+      https.get({ hostname: opts.hostname, path: opts.pathname + opts.search, headers: { 'User-Agent': 'DocVault-Desktop', ...headers } }, res => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          return follow(res.headers.location, depth + 1)
+        }
+        let data = ''
+        res.on('data', c => data += c)
+        res.on('end', () => resolve({ statusCode: res.statusCode, body: data, headers: res.headers }))
+      }).on('error', reject)
+    }
+    follow(url, 0)
+  })
+}
+
+ipcMain.handle('update:check', async () => {
+  try {
+    const res = await httpsGet('https://api.github.com/repos/joshbaker90/docvault-desktop/releases/latest', {
+      Accept: 'application/vnd.github+json'
+    })
+    if (res.statusCode !== 200) return null
+    const json = JSON.parse(res.body)
+    const remoteVersion = (json.tag_name || '').replace(/^v/, '')
+    if (!isNewerVersion(remoteVersion, app.getVersion())) return null
+
+    const assets = json.assets || []
+    let assetName
+    if (process.platform === 'win32') assetName = 'DocVault-Setup.exe'
+    else if (process.platform === 'darwin') assetName = process.arch === 'arm64' ? 'DocVault-arm64.dmg' : 'DocVault-x64.dmg'
+    else assetName = 'DocVault.AppImage'
+
+    const asset = assets.find(a => a.name === assetName)
+    if (!asset) return null
+    return { version: remoteVersion, url: asset.browser_download_url, size: asset.size, name: asset.name }
+  } catch (_) { return null }
+})
+
+ipcMain.handle('update:download', (event, url, name) => {
+  const tmpPath = path.join(os.tmpdir(), name)
+  return new Promise((resolve, reject) => {
+    const download = (u, depth) => {
+      if (depth > 5) return reject(new Error('Too many redirects'))
+      const opts = new URL(u)
+      https.get({ hostname: opts.hostname, path: opts.pathname + opts.search, headers: { 'User-Agent': 'DocVault-Desktop' } }, res => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          return download(res.headers.location, depth + 1)
+        }
+        const total = parseInt(res.headers['content-length'] || '0')
+        let downloaded = 0
+        const file = fs.createWriteStream(tmpPath)
+        res.on('data', chunk => {
+          downloaded += chunk.length
+          if (total > 0) {
+            const win = BrowserWindow.getAllWindows()[0]
+            if (win) win.webContents.send('update:progress', downloaded / total)
+          }
+        })
+        res.pipe(file)
+        file.on('finish', () => { file.close(); resolve(tmpPath) })
+        file.on('error', reject)
+      }).on('error', reject)
+    }
+    download(url, 0)
+  })
+})
+
+ipcMain.handle('update:install', async (_, localPath) => {
+  if (process.platform === 'linux') {
+    try { fs.chmodSync(localPath, '755') } catch (_) {}
+  }
+  await shell.openPath(localPath)
 })

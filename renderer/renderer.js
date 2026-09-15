@@ -25,6 +25,7 @@ function mkIaBtn(cls, title, path) {
 
 // ── Init ─────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
+  await showSplashScreen()
   const locked = await window.api.lock.isEnabled()
   if (locked) {
     await showLockScreen()
@@ -32,6 +33,57 @@ window.addEventListener('DOMContentLoaded', async () => {
     await initApp()
   }
 })
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
+
+async function showSplashScreen() {
+  const overlay = document.getElementById('splash-screen')
+  const spinner = document.getElementById('splash-spinner')
+  const message = document.getElementById('splash-message')
+  const progressWrap = document.getElementById('splash-progress-wrap')
+  const progressFill = document.getElementById('splash-progress-fill')
+  const percent = document.getElementById('splash-percent')
+  const versionEl = document.getElementById('splash-version')
+
+  const version = await window.api.app.version()
+  if (versionEl) versionEl.textContent = `v${version}`
+
+  const update = await window.api.update.check()
+
+  if (!update) {
+    message.textContent = 'Up to date'
+    spinner.style.display = 'none'
+    await sleep(600)
+  } else {
+    message.textContent = `Update available — v${update.version}`
+    await sleep(700)
+
+    spinner.style.display = 'none'
+    progressWrap.style.display = 'block'
+    message.textContent = `Downloading v${update.version}…`
+
+    window.api.update.onProgress(p => {
+      progressFill.style.width = `${(p * 100).toFixed(0)}%`
+      percent.textContent = `${(p * 100).toFixed(0)}%`
+    })
+
+    try {
+      const localPath = await window.api.update.download(update.url, update.name)
+      progressFill.style.width = '100%'
+      percent.textContent = '100%'
+      message.textContent = 'Installing…'
+      await window.api.update.install(localPath)
+      await sleep(1500)
+    } catch (e) {
+      message.textContent = `Update failed — continuing`
+      await sleep(1800)
+    }
+  }
+
+  overlay.classList.add('fade-out')
+  await sleep(520)
+  overlay.style.display = 'none'
+}
 
 async function initApp() {
   cfg = await window.api.config.get()
