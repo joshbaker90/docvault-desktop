@@ -211,20 +211,54 @@ ipcMain.handle('files:open-local', async (_, localPath) => {
   await shell.openPath(localPath)
 })
 
+// Recursively walks a selected path (file or folder) into a flat list of
+// {localPath, relPath} — relPath is relative to wherever the selection lands
+// in the vault, preserving the folder's own name and every nested subfolder
+// beneath it, e.g. picking "Invoices" containing "2026/jan.pdf" produces
+// relPath "Invoices/2026/jan.pdf". A plain file just yields itself.
+function collectUploadFiles(localPath, relPrefix) {
+  const stat = fs.statSync(localPath)
+  if (!stat.isDirectory()) return [{ localPath, relPath: relPrefix }]
+  const files = []
+  for (const entry of fs.readdirSync(localPath)) {
+    files.push(...collectUploadFiles(path.join(localPath, entry), `${relPrefix}/${entry}`))
+  }
+  return files
+}
+
 ipcMain.handle('files:upload', async (_, cfg, currentRemotePath) => {
-  const result = await dialog.showOpenDialog({ properties: ['openFile', 'multiSelections'] })
+  const result = await dialog.showOpenDialog({ properties: ['openFile', 'openDirectory', 'multiSelections'] })
   if (result.canceled) return { uploaded: 0 }
 
   const basePath = (cfg.hetznerBasePath || '/docvault').replace(/\/$/, '')
   const localDocDir = path.join(app.getPath('documents'), 'DocVault')
+  const relFolder = currentRemotePath.replace(basePath, '').replace(/^\//, '').replace(/\/$/, '')
   let uploaded = 0
 
-  for (const localPath of result.filePaths) {
-    const name = path.basename(localPath)
-    // Determine relative path within vault
-    const relFolder = currentRemotePath.replace(basePath, '').replace(/^\//, '').replace(/\/$/, '')
-    const relPath = relFolder ? `${relFolder}/${name}` : name
+  // WebDAV PUT generally needs the parent collection to already exist —
+  // folder upload can introduce brand-new nested directories that have never
+  // existed remotely before, unlike a plain file drop into a folder that's
+  // already there. MKCOL is idempotent here (mkdirRemote ignores the result),
+  // so this is safe to call even when the directory already exists.
+  const ensuredDirs = new Set()
+  async function ensureRemoteDir(relDirPath) {
+    if (!relDirPath || ensuredDirs.has(relDirPath)) return
+    ensuredDirs.add(relDirPath)
+    const parent = relDirPath.split('/').slice(0, -1).join('/')
+    if (parent) await ensureRemoteDir(parent)
+    await hetzner.mkdirRemote(cfg, `${basePath}/${relDirPath}`)
+  }
+
+  const allFiles = []
+  for (const selectedPath of result.filePaths) {
+    allFiles.push(...collectUploadFiles(selectedPath, path.basename(selectedPath)))
+  }
+
+  for (const { localPath, relPath: withinSelection } of allFiles) {
+    const relPath = relFolder ? `${relFolder}/${withinSelection}` : withinSelection
     const remotePath = `${basePath}/${relPath}`
+    const relDir = relPath.split('/').slice(0, -1).join('/')
+    if (relDir) await ensureRemoteDir(relDir)
 
     // Copy to local vault folder
     const localDest = path.join(localDocDir, relPath)
