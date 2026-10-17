@@ -146,7 +146,12 @@ function parsePropfind(xml, requestPath) {
     const block = m[1]
     const hrefMatch = block.match(/<(?:[A-Za-z]+:)?href[^>]*>([^<]+)<\/(?:[A-Za-z]+:)?href>/i)
     if (!hrefMatch) continue
-    const href = decodeURIComponent(hrefMatch[1].trim())
+    // Hetzner returns & in paths as &amp; (valid XML entity) — decode XML
+    // entities first, then URL-decode, so names like "Tithe & Talent" survive.
+    const rawHref = hrefMatch[1].trim()
+        .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+    const href = decodeURIComponent(rawHref)
     if (trimSlash(href) === normalised) continue
     const isDir = /<(?:[A-Za-z]+:)?collection[\s/>]/i.test(block)
     const sizeMatch = block.match(/<(?:[A-Za-z]+:)?getcontentlength[^>]*>(\d+)<\/(?:[A-Za-z]+:)?getcontentlength>/i)
